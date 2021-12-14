@@ -1,0 +1,53 @@
+// Composite 6 months of Landsat 8.
+
+// Note that the input to simpleComposite is raw data.
+var l8_comp = ee.ImageCollection('LANDSAT/LC08/C01/T1')
+  .filterDate('2015-1-1', '2015-7-1')
+  
+// TOA layer was needed for pansharpening process.  Created 2nd image collection
+var l8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA')
+  .filterDate('2015-1-1', '2015-7-1')
+  .filterMetadata('CLOUD_COVER', 'Less_Than', 20);
+
+// The asFloat parameter gives floating-point TOA output instead of
+// the UINT8 outputs of the default simpleComposite().
+var composite = ee.Algorithms.Landsat.simpleComposite({
+  collection: l8_comp,
+  asFloat: true
+});
+
+// Display a composite with a band combination chosen from:
+// https://landsat.usgs.gov/how-do-landsat-8-band-combinations-differ-landsat-7-or-landsat-5-satellite-data
+Map.addLayer(composite, {bands: ['B4', 'B3', 'B2'], max: [0.3, 0.3, 0.3]});
+
+
+//HSV Sharpening using 'Band 8' - 15 meter resolution
+
+// Select bands 4-3-2 normal image
+var rgb = ['B4', 'B3', 'B2'];
+
+//Create image of avg pixel
+var l8IMG = ee.Image(l8.mean());
+
+
+//Pan sharpen using HSV
+//http://www.gisandbeers.com/pansharpening-en-google-earth-engine-imagenes-landsat/
+var l8HSV = l8IMG.select(rgb).rgbToHsv();
+
+var panSharp = ee.Image.cat([
+  l8HSV.select('hue'),
+  l8HSV.select('saturation'),
+  //panchromatic band for landsat
+  l8IMG.select('B8')
+  ]).hsvToRgb();
+
+Map.centerObject(geometry, 15);
+
+Map.addLayer(panSharp, {
+  min: 0.0,
+  max: 0.3,
+  gama: 1.0,
+  bands: ['red','green','blue']},
+  'Imagesn Landsat 8 - Pansharpening');
+
+  
